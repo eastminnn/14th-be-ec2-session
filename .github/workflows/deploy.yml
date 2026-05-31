@@ -1,0 +1,43 @@
+name: EC2 Docker Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: ${{ secrets.EC2_PORT }}
+          script: |
+            cd ~/14th-be-ec2-session
+
+            git pull origin main
+
+            cat > .env << EOF
+            DATABASE_NAME=${{ secrets.DATABASE_NAME }}
+            DATABASE_USER=${{ secrets.DATABASE_USER }}
+            DATABASE_PASS=${{ secrets.DATABASE_PASS }}
+
+            JWT_KEY=${{ secrets.JWT_KEY }}
+            JWT_AT_EXPIRATION=${{ secrets.JWT_AT_EXPIRATION }}
+            JWT_RT_EXPIRATION=${{ secrets.JWT_RT_EXPIRATION }}
+            JWT_ISSUER=${{ secrets.JWT_ISSUER }}
+            EOF
+
+            chmod +x gradlew
+            ./gradlew clean bootJar -x test
+
+            sudo docker compose down
+            sudo docker compose up -d --build
